@@ -1,0 +1,10 @@
+--------------Backend setup -------
+1. python3 -m venv venv
+2. source venv/bin/activate (if Linux)
+3. pip install fastapi
+4. pip freeze > requirements.txt
+5. fastapi --version
+
+// make basic main.py setup
+
+1.fastapi dev main.py (auto reload in dev mode)
