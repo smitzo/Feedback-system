@@ -28,3 +28,18 @@ archive.zip
 
 # macOS
 .DS_Store
+
+# Local planning, credentials, databases and build output
+/openspec/
+/.venv/
+**/.env
+!**/.env.example
+*.db
+*.db-*
+node_modules/
+frontend/dist/
+playwright-report/
+test-results/
+.ruff_cache/
+*.egg-info/
+/artifacts/
