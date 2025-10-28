@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
 from .common import Record
+
+if TYPE_CHECKING:
+    from .grant import Grant
 
 
 class User(Record, Base):
