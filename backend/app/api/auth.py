@@ -56,3 +56,15 @@ def login(data: Login, request: Request, response: Response, db: Session = Depen
 @router.get("/me")
 def me(actor: User = Depends(current_user)):
     return {"user": public_user(actor), "capabilities": capabilities(actor)}
+
+
+@router.post("/logout", status_code=204)
+def logout(
+    request: Request,
+    response: Response,
+    actor: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    db.delete(request.state.login_session)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/")
