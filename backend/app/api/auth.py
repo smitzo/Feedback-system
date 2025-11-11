@@ -68,3 +68,18 @@ def logout(
     db.delete(request.state.login_session)
     response.delete_cookie(SESSION_COOKIE, path="/")
     response.delete_cookie(CSRF_COOKIE, path="/")
+
+
+@router.post("/password", status_code=204)
+def password(
+    data: PasswordChange,
+    response: Response,
+    actor: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(data.current_password, actor.password_hash):
+        fail(400, "Current password is incorrect")
+    actor.password_hash = hash_password(data.new_password)
+    db.execute(delete(LoginSession).where(LoginSession.user_id == actor.id))
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/")
