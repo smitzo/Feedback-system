@@ -18,6 +18,7 @@ from ..errors import fail
 from ..models import LoginSession, User
 from ..passwords import hash_password, verify_password
 from ..schemas import Login, PasswordChange
+from ..throttle import check_login, failed_login
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 DUMMY_HASH = hash_password("Unused timing equalizer 42")
@@ -45,9 +46,11 @@ def start_session(request, response, db, user):
 def login(data: Login, request: Request, response: Response, db: Session = Depends(get_db)):
     if request.headers.get("origin") not in request.app.state.settings.allowed_origins:
         fail(403, "Sign in from the workspace")
+    check_login(request, db, data.email)
     user = db.scalar(select(User).where(User.email == data.email))
     valid = verify_password(data.password, user.password_hash if user else DUMMY_HASH)
     if not user or not valid or not user.active:
+        failed_login(request, db, data.email)
         fail(401, "Email or password is incorrect")
     start_session(request, response, db, user)
     return {"user": public_user(user), "capabilities": capabilities(user)}
