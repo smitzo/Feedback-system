@@ -7,6 +7,7 @@ from . import models  # noqa: F401
 from .api import routers
 from .database import make_engine, session_factory
 from .errors import configure_errors
+from .headers import secure_headers
 from .settings import Settings
 
 
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Content-Type", "X-CSRF-Token"],
     )
     configure_errors(app)
+    secure_headers(app)
     for router in routers:
         app.include_router(router, prefix="/api/v1")
     return app
