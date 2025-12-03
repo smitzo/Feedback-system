@@ -61,3 +61,29 @@ def people(
         "offset": offset,
         "limit": limit,
     }
+
+
+@router.post("", status_code=201)
+def create_person(
+    data: PersonCreate, actor: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    require(actor, Permission.PEOPLE_MANAGE)
+    if actor.role != Role.ADMIN and data.role != Role.EMPLOYEE:
+        fail(403, "Only an administrator can assign privileged roles")
+    email = str(data.email).lower()
+    if db.scalar(select(User.id).where(User.email == email)):
+        fail(409, "An account already uses that email")
+    validate_manager(db, None, data.manager_id)
+    user = User(
+        **data.model_dump(exclude={"password", "email"}),
+        email=email,
+        password_hash=hash_password(data.password),
+    )
+    db.add(user)
+    db.flush()
+    db.add(
+        AuditEvent(
+            actor_id=actor.id, action="person.created", resource_type="user", resource_id=user.id
+        )
+    )
+    return public_user(user)
