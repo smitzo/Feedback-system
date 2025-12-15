@@ -87,3 +87,48 @@ def create_person(
         )
     )
     return public_user(user)
+
+
+@router.patch("/{user_id}")
+def update_person(
+    user_id: str,
+    data: PersonUpdate,
+    actor: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    require(actor, Permission.PEOPLE_MANAGE)
+    # Serialize graph and final-administrator changes on databases supporting row locks.
+    db.scalars(select(User).order_by(User.id).with_for_update()).all()
+    target = db.get(User, user_id)
+    if not target:
+        fail(404, "Employee not found")
+    updates = data.model_dump(exclude_unset=True)
+    if any(value is None for key, value in updates.items() if key != "manager_id"):
+        fail(422, "Only manager_id may be cleared")
+    if actor.role != Role.ADMIN and ("role" in updates or target.role != Role.EMPLOYEE):
+        fail(403, "Only an administrator can change privileged accounts")
+    role = updates.get("role", target.role)
+    active = updates.get("active", target.active)
+    if target.role == Role.ADMIN and (role != Role.ADMIN or not active):
+        others = db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.role == Role.ADMIN, User.active, User.id != target.id)
+        )
+        if not others:
+            fail(409, "Keep at least one active administrator")
+    if (target.role == Role.MANAGER and role != Role.MANAGER) or not active:
+        if db.scalar(select(User.id).where(User.manager_id == target.id, User.active).limit(1)):
+            fail(409, "Reassign active direct reports first")
+    if "manager_id" in updates:
+        validate_manager(db, target.id, updates["manager_id"])
+    for key, value in updates.items():
+        setattr(target, key, value)
+    if {"role", "active", "manager_id"} & updates.keys():
+        revoke_sessions(db, target.id)
+    db.add(
+        AuditEvent(
+            actor_id=actor.id, action="person.updated", resource_type="user", resource_id=target.id
+        )
+    )
+    return public_user(target)
