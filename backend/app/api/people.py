@@ -132,3 +132,61 @@ def update_person(
         )
     )
     return public_user(target)
+
+
+@router.get("/{user_id}/grants")
+def grants(user_id: str, actor: User = Depends(current_user), db: Session = Depends(get_db)):
+    if actor.role != Role.ADMIN:
+        fail(403, "Only administrators manage grants")
+    target = db.get(User, user_id)
+    if not target:
+        fail(404, "Employee not found")
+    return {"items": [grant.permission for grant in target.grants], "available": list(Permission)}
+
+
+@router.post("/{user_id}/grants", status_code=204)
+def add_grant(
+    user_id: str,
+    data: GrantInput,
+    actor: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    if actor.role != Role.ADMIN:
+        fail(403, "Only administrators manage grants")
+    target = db.get(User, user_id)
+    if not target:
+        fail(404, "Employee not found")
+    if not any(g.permission == data.permission for g in target.grants):
+        db.add(Grant(user_id=user_id, permission=data.permission))
+        revoke_sessions(db, user_id)
+        db.add(
+            AuditEvent(
+                actor_id=actor.id, action="grant.added", resource_type="user", resource_id=user_id
+            )
+        )
+
+
+@router.delete("/{user_id}/grants/{permission}", status_code=204)
+def remove_grant(
+    user_id: str,
+    permission: Permission,
+    actor: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    if actor.role != Role.ADMIN:
+        fail(403, "Only administrators manage grants")
+    target = db.get(User, user_id)
+    if not target:
+        fail(404, "Employee not found")
+    for grant in target.grants:
+        if grant.permission == permission:
+            db.delete(grant)
+            revoke_sessions(db, user_id)
+            db.add(
+                AuditEvent(
+                    actor_id=actor.id,
+                    action="grant.removed",
+                    resource_type="user",
+                    resource_id=user_id,
+                )
+            )
